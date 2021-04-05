@@ -1,0 +1,219 @@
+---
+title: "ISM6354 - Project Report"
+output: html_notebook
+---
+
+```{r}
+#data prep
+winequalityN
+#omit missing values
+wine <- na.omit(winequalityN)
+wine
+```
+
+```{r}
+#install orinal package
+install.packages('MASS')
+install.packages('ggplot2')
+install.packages('truncreg')
+install.packages('AER')
+install.packages('maxLik')
+install.packages('miscTools')
+```
+
+```{r}
+#ordinal
+library(MASS)
+library(ggplot2)
+library(truncreg)
+library(AER)
+```
+
+```{r}
+#ordinal logsitic regression
+ordinal <- wine
+
+#set order
+ordinal$quality  <-  factor(ordinal$quality, levels=c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10), ordered=TRUE)
+
+#estimate model
+ord_reg <- polr(quality ~ type + fixed.acidity + volatile.acidity + citric.acid + residual.sugar + chlorides + free.sulfur.dioxide + total.sulfur.dioxide + density + pH + sulphates + alcohol, data = ordinal, Hess = TRUE)
+summary(ord_reg)
+
+#add p-value
+results <- coef(summary(ord_reg))
+p_values <- pnorm(abs(results[, "t value"]), lower.tail = FALSE)* 2
+results <- cbind(results, "p value" = round(p_values, 3))
+results
+
+```
+```{r}
+#prediction #1
+
+#create a data point
+ord_data <- data.frame('type' = 'white', 'fixed.acidity' = 6, 'volatile.acidity' = 0.26, 'citric.acid' = 0.32, 'residual.sugar' = 19.7, 'chlorides' = 0.036, 'free.sulfur.dioxide' = 44, 'total.sulfur.dioxide' = 165, 'density' = 0.9955, 'pH' = 2.97, 'sulphates' = 0.45, 'alcohol' = 8.7)
+
+#predict probabilities of each category 
+round(predict(ord_reg, ord_data, type = 'p'), 3)
+
+```
+
+```{r}
+#prediction #2
+
+#create a data point
+ord_data <- data.frame('type' = 'red', 'fixed.acidity' = 8, 'volatile.acidity' = 0.16, 'citric.acid' = 0.27, 'residual.sugar' = 22, 'chlorides' = 0.021, 'free.sulfur.dioxide' = 47, 'total.sulfur.dioxide' = 75, 'density' = 0.9900, 'pH' = 3.47, 'sulphates' = 0.50, 'alcohol' = 13)
+
+#predict probabilities of each category 
+round(predict(ord_reg, ord_data, type = 'p'), 3)
+```
+
+
+```{r}
+#install cluster packages
+install.packages('caret')
+install.packages('dbscan')
+install.packages('purrr')
+install.packages('cluster')
+install.packages('lattice')
+install.packages('factoextra')
+```
+
+```{r}
+#kmeans cluster
+library(caret)
+library(dbscan)
+library(tidyverse)
+library(cluster)
+library(ggplot2)
+library(factoextra)
+```
+
+```{r}
+#install dummy package
+install.packages('fastDummies')
+```
+
+```{r}
+#cluster dummies
+library('fastDummies')
+dum <- dummy_cols(wine, select_columns = 'type',
+remove_selected_columns = TRUE, remove_first_dummy = TRUE)
+dum
+```
+
+```{r}
+#kmeans
+sse <- function(k) {kmeans(dum, k, nstart = 10)$tot.withinss}
+
+k.values <- 1:15
+
+all_sses <- map_dbl(k.values, sse)
+
+all_sses
+
+options(repr.plot.width=10, repr.plot.height=5)
+
+plot(k.values, all_sses, type='b', pch = 19, 
+xlab='Number of clusters K', ylab='Total within-clusters sum of squares')
+```
+
+```{r}
+#kmeans
+k_final <- kmeans(dum, centers = 4, nstart = 10)
+print(k_final)
+fviz_cluster(k_final, data = dum)
+```
+
+```{r}
+#boxplot quality
+ggplot(wine, aes(type, quality)) + geom_boxplot() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
+```
+
+```{r}
+#boxplot alcohol
+ggplot(wine, aes(type, alcohol)) + geom_boxplot() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
+```
+
+```{r}
+#barplot type
+ggplot(wine) + geom_bar(mapping = aes(x = type, fill = type))
+```
+```{r} 
+
+#d 
+
+zz <- filter(dumwine, dumwine$type_white == 0) 
+
+zz 
+
+ggplot(zz, aes(alcohol)) + geom_bar() 
+
+  
+
+yy <- filter(dumwine, dumwine$type_white == 1) 
+
+yy 
+
+ggplot(yy, aes(alcohol)) + geom_bar() 
+
+``` 
+
+```{r}
+# this might show that the data is truncated???? 
+ggplot(wine, aes(x=alcohol, y=stat(count)/sum(stat(count)))) + geom_histogram(binwidth=.1) + ylab('Percentage')
+```
+
+```{r}
+# higher quality wines have higher alcohol percentage 
+ggplot(wine, aes(quality, alcohol)) + stat_summary(fun="mean", geom="bar")
+```
+
+```{r}
+# Linear Regression: omit type
+linear_model <- lm(alcohol ~ . - type, data=wine)
+
+summary(linear_model)
+
+# error metrix
+rmse(wine$alcohol, predict(linear_model))
+```
+
+```{r}
+# turn type into numeric form
+dumwine <- dummy_cols(wine, select_columns = 'type',
+remove_selected_columns = TRUE, remove_first_dummy = TRUE)
+dumwine
+```
+
+```{r}
+# Linear model: Including alcohol
+linear_model <- lm(alcohol ~ ., data=dumwine)
+
+summary(linear_model)
+
+# error metrix
+rmse(dumwine$alcohol, predict(linear_model))
+```
+
+```{r}
+# Linear Model: with type. without total.sulfur.dioxide
+# explain this model - white wine has lower alchol percentage
+# a lot of wine people like red wines
+linear_model <- lm(alcohol ~ . - total.sulfur.dioxide, data=dumwine)
+
+summary(linear_model)
+
+# error metrix
+rmse(dumwine$alcohol, predict(linear_model))
+```
+
+
+
+
+
+
+
+
