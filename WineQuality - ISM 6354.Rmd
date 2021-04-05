@@ -1,0 +1,164 @@
+---
+title: "Wine Quality"
+output: html_document
+---
+```{r}
+install.packages('fastDummies')
+```
+
+```{r}
+library('fastDummies')
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(Metrics)
+library(caret)
+library(dbscan)
+library(tidyverse)
+library(cluster)
+library(ggplot2)
+
+```
+
+```{r}
+head(winequalityN)
+str(winequalityN)
+```
+```{r}
+wine <- na.omit(winequalityN)
+```
+
+```{r}
+# Data Exploration
+# not that helpful
+options(repr.plot.width=6, repr.plot.height=3)
+
+
+ggplot(wine, aes(density, pH)) + 
+ geom_point(aes(color = pH)) + 
+ geom_smooth(method ="lm") + 
+ scale_color_gradient() + 
+ theme_bw() 
+```
+```{r}
+# Data Exploration: fixed.acidity & alcohol 
+# not that helpful
+options(repr.plot.width=6, repr.plot.height=3)
+
+
+ggplot(wine, aes(alcohol, fixed.acidity)) + 
+ geom_point(aes(color = pH)) + 
+ geom_smooth(method ="lm") + 
+ scale_color_gradient() + 
+ theme_bw() 
+```
+
+```{r}
+# Data Exploration: citric.acid & alcohol
+# not that helpful
+options(repr.plot.width=6, repr.plot.height=3)
+
+
+ggplot(wine, aes(alcohol, citric.acid)) + 
+ geom_point(aes(color = pH)) + 
+ geom_smooth(method ="lm") + 
+ scale_color_gradient() + 
+ theme_bw() 
+
+```
+```{r}
+# Data Exploration: volatile.acidity & alcohol
+# not that helpful
+options(repr.plot.width=6, repr.plot.height=3)
+
+
+ggplot(wine, aes(alcohol, volatile.acidity)) + 
+ geom_point(aes(color = pH)) + 
+ geom_smooth(method ="lm") + 
+ scale_color_gradient() + 
+ theme_bw() 
+```
+```{r}
+# this might show that the data is truncated???? there is not much below below 9% but the rest looks like a normal distribution. 
+ggplot(wine, aes(x=alcohol, y=stat(count)/sum(stat(count)))) + geom_histogram(binwidth=.1) + ylab('Percentage')
+```
+```{r}
+# higher quality wines have higher alcohol percentage 
+ggplot(wine, aes(quality, alcohol)) + stat_summary(fun="mean", geom="bar")
+```
+
+```{r}
+# Ask andy about truncated regression
+
+truncated_reg <- truncreg(alcohol ~ type, data = wine, point = 8, direction = 'right')
+summary(truncated_reg)
+```
+
+```{r}
+# Linear Regression: omit type
+linear_model <- lm(alcohol ~ . - type, data=wine)
+
+summary(linear_model)
+
+# error metrix
+rmse(wine$alcohol, predict(linear_model))
+```
+```{r}
+# turn type into numeric form
+dumwine <- dummy_cols(wine, select_columns = 'type',
+remove_selected_columns = TRUE, remove_first_dummy = TRUE)
+dumwine
+
+```
+```{r}
+# Linear model: Including alcohol
+linear_model <- lm(alcohol ~ ., data=dumwine)
+
+summary(linear_model)
+
+# error metrix
+rmse(dumwine$alcohol, predict(linear_model))
+```
+
+```{r}
+# Linear Model: with type. without total.sulfur.dioxide
+# explain this model - white wine has lower alchol percentage
+# a lot of wine people like red wines
+linear_model <- lm(alcohol ~ . - total.sulfur.dioxide, data=dumwine)
+
+summary(linear_model)
+
+# error metrix
+rmse(dumwine$alcohol, predict(linear_model))
+```
+```{r}
+# Linear Regression only acid and pH 
+linear_model <- lm(alcohol ~ fixed.acidity + volatile.acidity + citric.acid + pH, data=dumwine)
+
+summary(linear_model)
+
+# error metrix
+rmse(dumwine$alcohol, predict(linear_model))
+```
+# choose one with highest adjusted r squared
+# include bargraph about quality and alcohol percentage
+
+```{r} 
+
+#d 
+
+zz <- filter(dumwine, dumwine$type_white == 0) 
+
+zz 
+
+ggplot(zz, aes(alcohol)) + geom_bar() 
+
+  
+
+yy <- filter(dumwine, dumwine$type_white == 1) 
+
+yy 
+
+ggplot(yy, aes(alcohol)) + geom_bar() 
+
+``` 
